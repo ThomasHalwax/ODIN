@@ -11,7 +11,8 @@ export const descriptors = {
   grayscale: { label: 'Grayscale', value: 0, min: 0, max: 100, delta: 5, unit: '%', display: '%' },
   'hue-rotate': { label: 'Hue', value: 0, min: 0, max: 360, delta: 10, unit: 'deg', display: '°' },
   invert: { label: 'Invert', value: 0, min: 0, max: 100, delta: 5, unit: '%', display: '%' },
-  sepia: { label: 'Sepia', value: 0, min: 0, max: 100, delta: 5, unit: '%', display: '%' }
+  sepia: { label: 'Sepia', value: 0, min: 0, max: 100, delta: 5, unit: '%', display: '%' },
+  opacity: { label: 'Opacity', value: 100, min: 0, max: 100, delta: 5, unit: '%', display: '%' }
 }
 
 export const defaultValues = () => Object.entries(descriptors)

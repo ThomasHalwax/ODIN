@@ -25,7 +25,13 @@ export default {
     hide: () => settings.set(MAP_VISIBLE, false),
     getViewPort: () => settings.get(VIEW_PORT),
     setViewPort: viewPort => settings.set(VIEW_PORT, viewPort),
-    getDisplayFilters: defaultFilters => settings.get(DISPLAY_FILTERS) || defaultFilters,
+    getDisplayFilters: defaultFilters => {
+      const filters = settings.get(DISPLAY_FILTERS) || {}
+      Object.keys(defaultFilters)
+        .filter(key => !filters[key])
+        .forEach(key => (filters[key] = defaultFilters[key]))
+      return filters
+    },
     setDisplayFilters: values => settings.set(DISPLAY_FILTERS, values)
   },
   palette: {

@@ -15,7 +15,8 @@ const menu = settings => {
     { label: 'Grayscale', command: 'grayscale' },
     { label: 'Hue', command: 'hue-rotate' },
     { label: 'Invert', command: 'invert' },
-    { label: 'Sepia', command: 'sepia' }
+    { label: 'Sepia', command: 'sepia' },
+    { label: 'Opacity', command: 'opacity' }
   ].map(({ label, command }, index) => ({
     label,
     click: sendMessage('COMMAND_ADJUST', command),
