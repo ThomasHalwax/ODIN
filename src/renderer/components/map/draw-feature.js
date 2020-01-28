@@ -192,6 +192,13 @@ const handlers = {
   orbit
 }
 
+/* experimental fs git */
+/* whenever a feature is deselected, we 'commit' the layer containing the feature */
+selection.on('deselected', featureUrn => {
+  const urns = featureUrn.split(':')
+  layerStore.commands.commit(urns[2])
+})
+
 
 export default sidc => {
 

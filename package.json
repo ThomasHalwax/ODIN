@@ -59,6 +59,7 @@
     "@material-ui/icons": "^4.4.3",
     "electron-settings": "^3.2.0",
     "geodesy": "^2.2.0",
+    "isomorphic-git": "^0.78.2",
     "leaflet": "1.5.1",
     "level": "^5.0.1",
     "lodash.throttle": "^4.1.1",

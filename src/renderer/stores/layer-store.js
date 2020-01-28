@@ -1,9 +1,103 @@
-import { ipcRenderer } from 'electron'
+import electron, { ipcRenderer } from 'electron'
 import now from 'nano-time'
 import uuid from 'uuid-random'
 import * as R from 'ramda'
 import { db } from './db'
 import { clipboard } from '../components/App.clipboard'
+
+/* ++ experimental fs store with git features */
+import fs from 'fs'
+import path from 'path'
+import * as git from 'isomorphic-git'
+
+git.plugins.set('fs', fs)
+
+let updateSequence = 0
+let persistedUpdateSequence = 0
+
+const ROOT_FOLDER = path.join((electron.app || electron.remote.app).getPath('userData'), 'ODIN-fs-store')
+
+const initializeGitStore = async (path) => {
+  if (!fs.existsSync(path)) {
+    fs.mkdirSync(path)
+  }
+  try {
+    const initResult = await git.init({
+      gitdir: path,
+      noOverwrite: true
+    })
+    console.log(`initialized git repo at ${path}`)
+    console.dir(initResult)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const writeLayer = (state, layerId) => {
+  console.log(`updateSequence: ${updateSequence} -- persistedUpdateSequence: ${persistedUpdateSequence}`)
+  if (updateSequence === persistedUpdateSequence) {
+    console.log('nothing has changed, skipping git persistance')
+    return
+  }
+  console.time('save-layer-and-commit')
+  const fileName = `layer-${layerId}.json`
+  const fullPathAndFileName = path.join(ROOT_FOLDER, fileName)
+  const content = JSON.stringify(state[layerId], null, 2)
+  fs.writeFile(fullPathAndFileName, content, error => {
+    if (error) {
+      return console.error(error)
+    }
+    console.log(`done persisting ${fullPathAndFileName}`)
+    git.add({
+      dir: ROOT_FOLDER,
+      filepath: fileName
+    })
+      .then(() => {
+        return git.commit({
+          dir: ROOT_FOLDER,
+          author: {
+            name: 'thomas',
+            email: 'thomas.halwax@syncpoint.io'
+          },
+          message: `persisted layer id ${layerId}`
+        })
+      })
+      .then(sha => {
+        console.log(`commited changes with hash ${sha}`)
+        persistedUpdateSequence = updateSequence
+      })
+      .catch(error => {
+        console.error(error)
+      })
+  })
+  console.timeEnd('save-layer-and-commit')
+}
+
+const deleteLayer = deleteLayerEvent => {
+  const layerFileName = `layer-${deleteLayerEvent.layerId}.json`
+  const fullPath = path.join(ROOT_FOLDER, layerFileName)
+  if (!fs.existsSync(fullPath)) return
+  fs.unlinkSync(fullPath)
+  git.remove({
+    gitdir: ROOT_FOLDER,
+    filepath: layerFileName
+  })
+    .then(() => {
+      return git.commit({
+        dir: ROOT_FOLDER,
+        author: {
+          name: 'thomas',
+          email: 'thomas.halwax@syncpoint.io'
+        },
+        message: `removed layer ${deleteLayerEvent.layerId}`
+      })
+    })
+    .catch(error => {
+      console.error(error)
+    })
+}
+
+/* -- experimantal fs store ... */
 
 // TODO: purge snapshots/events
 
@@ -38,6 +132,8 @@ const reduce = event => {
 
 const persist = event => {
   db.put(`layer:journal:${now()}`, event)
+  // updateSequence is required for experimantal fs git
+  updateSequence++
   reduce(event)
   reducers.forEach(reduce => reduce(event))
 }
@@ -92,6 +188,7 @@ evented.addLayer = (layerId, name) => {
   const existing = Object.entries(state).find(([_, layer]) => layer.name === name)
   if (existing) persist({ type: 'layer-deleted', layerId: existing[0] })
   persist({ type: 'layer-added', layerId, name, show: true })
+  writeLayer(state, layerId)
 }
 
 evented.updateBounds = (layerId, bbox) => {
@@ -103,7 +200,10 @@ evented.updateBounds = (layerId, bbox) => {
 evented.deleteLayer = layerIds => (layerIds || Object.keys(state))
   .filter(layerId => state[layerId])
   .map(layerId => ({ type: 'layer-deleted', layerId }))
-  .forEach(persist)
+  .forEach(deleteLayerEvent => {
+    persist(deleteLayerEvent)
+    deleteLayer(deleteLayerEvent)
+  })
 
 evented.hideLayer = layerIds => (layerIds || Object.keys(state))
   .filter(layerId => state[layerId])
@@ -166,6 +266,11 @@ commands.update = (layerId, featureId) => feature => {
   return factory(current, feature)
 }
 
+/* experimental fs git */
+commands.commit = (layerId) => {
+  writeLayer(state, layerId)
+}
+
 // Clipboard handlers ==>
 
 clipboard.register('feature', {
@@ -186,5 +291,9 @@ ipcRenderer.on('COMMAND_LOAD_LAYER', (_, name, collection) => {
   evented.addLayer(layerId, name)
   collection.features.forEach(feature => evented.addFeature(layerId)(uuid(), feature))
 })
+
+;(async () => {
+  await initializeGitStore(ROOT_FOLDER)
+})()
 
 export default evented
