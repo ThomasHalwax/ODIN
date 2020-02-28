@@ -1,8 +1,6 @@
 import electron, { ipcRenderer } from 'electron'
-import now from 'nano-time'
 import uuid from 'uuid-random'
 import * as R from 'ramda'
-import { db } from './db'
 import { clipboard } from '../components/App.clipboard'
 
 /* ++ experimental fs store with git features */
@@ -21,13 +19,13 @@ const initializeGitStore = async (path) => {
   if (!fs.existsSync(path)) {
     fs.mkdirSync(path)
   }
+  /* git init runs every time the app starts, so noOverwrite MUST BE TRUE to avoid data loss */
   try {
-    const initResult = await git.init({
-      gitdir: path,
+    await git.init({
+      dir: path,
       noOverwrite: true
     })
     console.log(`initialized git repo at ${path}`)
-    console.dir(initResult)
   } catch (error) {
     console.error(error)
   }
@@ -40,7 +38,7 @@ const writeLayer = (state, layerId) => {
     return
   }
   console.time('save-layer-and-commit')
-  const fileName = `layer-${layerId}.json`
+  const fileName = `${layerId}.json`
   const fullPathAndFileName = path.join(ROOT_FOLDER, fileName)
   const content = JSON.stringify(state[layerId], null, 2)
   fs.writeFile(fullPathAndFileName, content, error => {
@@ -74,9 +72,11 @@ const writeLayer = (state, layerId) => {
 }
 
 const deleteLayer = deleteLayerEvent => {
-  const layerFileName = `layer-${deleteLayerEvent.layerId}.json`
+  const layerFileName = `${deleteLayerEvent.layerId}.json`
   const fullPath = path.join(ROOT_FOLDER, layerFileName)
+
   if (!fs.existsSync(fullPath)) return
+
   fs.unlinkSync(fullPath)
   git.remove({
     gitdir: ROOT_FOLDER,
@@ -98,13 +98,9 @@ const deleteLayer = deleteLayerEvent => {
 }
 
 /* -- experimantal fs store ... */
-
-// TODO: purge snapshots/events
-
 const evented = {}
 let state = {} // in-memory snapshot
 
-let eventCount = 0
 const reducers = []
 
 const handlers = {
@@ -120,65 +116,46 @@ const handlers = {
 }
 
 const reduce = event => {
-  if (eventCount < 500) eventCount += 1
-  else {
-    db.put(`layer:snapshot:${now()}`, { type: 'snapshot', snapshot: state })
-    eventCount = 0
-  }
-
   const handler = handlers[event.type]
   if (handler) handler(event)
 }
 
 const persist = event => {
-  db.put(`layer:journal:${now()}`, event)
-  // updateSequence is required for experimantal fs git
+  // updateSequence is required for experimental fs git
   updateSequence++
   reduce(event)
   reducers.forEach(reduce => reduce(event))
 }
 
+
 const replay = reduce => {
-  const snapshotOptions = () => ({
-    gte: 'layer:snapshot:',
-    lte: 'layer:snapshot:\xff',
-    keys: true,
-    reverse: true,
-    limit: 1
-  })
+  const enumerateDirectoryEntries = fs.promises.readdir(ROOT_FOLDER, { withFileTypes: true })
 
-  const journalOptions = timestamp => ({
-    gte: `layer:journal:${timestamp || ''}`,
-    lte: 'layer:journal:\xff',
-    keys: false
-  })
+  const entriesThatAreFiles = dirEntries => dirEntries.filter(dirEntry => dirEntry['isFile']())
+  const fileExtensionIsJson = dirEntries => dirEntries.filter(entry => entry.name.endsWith('.json'))
+  const extractFileNames = dirEntries => dirEntries.map(entry => entry.name)
+  const loadContent = fileName => fs.readFileSync(path.join(ROOT_FOLDER, fileName), 'utf8')
 
-  const replayJournal = options => new Promise((resolve, reject) => {
-    db.createReadStream(options)
-      .on('data', event => reduce(event))
-      .on('error', err => reject(err))
-      .on('end', () => resolve())
-  })
+  return enumerateDirectoryEntries
+    .then(entriesThatAreFiles)
+    .then(fileExtensionIsJson)
+    .then(extractFileNames)
+    .then(fileNames => {
+      const snapshot = {}
+      fileNames.forEach(fileName => {
+        const content = loadContent(fileName)
+        const layerId = fileName.split('.')[0]
+        snapshot[layerId] = JSON.parse(content)
+      })
 
-  const replaySnapshot = options => new Promise((resolve, reject) => {
-    let timestamp
-
-    const handleSnapshot = ({ key, value }) => {
-      timestamp = key.split(':')[2]
-      reduce(value)
-    }
-
-    db.createReadStream(options)
-      .on('data', handleSnapshot)
-      .on('error', err => reject(err))
-      .on('end', () => resolve(timestamp)) // undefined: no snapshot
-  })
-
-  return replaySnapshot(snapshotOptions())
-    .then(timestamp => journalOptions(timestamp))
-    .then(options => replayJournal(options))
+      reduce({
+        snapshot: snapshot,
+        type: 'snapshot'
+      })
+    })
     .then(() => reduce({ type: 'replay-ready' }))
 }
+
 
 replay(reduce).then(() => reducers.push(reduce))
 
