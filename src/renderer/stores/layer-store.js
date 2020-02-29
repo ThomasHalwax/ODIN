@@ -1,4 +1,4 @@
-import electron, { ipcRenderer } from 'electron'
+import { ipcRenderer } from 'electron'
 import uuid from 'uuid-random'
 import * as R from 'ramda'
 import { clipboard } from '../components/App.clipboard'
@@ -12,7 +12,7 @@ import os from 'os'
 let updateSequence = 0
 let persistedUpdateSequence = 0
 
-const ROOT_FOLDER = path.join(os.homedir(), 'ODIN-fs-store')
+const ROOT_FOLDER = path.join(os.homedir(), 'ODIN-Layers')
 
 const GIT_AUTHOR = {
   name: os.userInfo().username,
