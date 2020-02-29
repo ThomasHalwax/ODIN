@@ -7,13 +7,24 @@ import { clipboard } from '../components/App.clipboard'
 import fs from 'fs'
 import path from 'path'
 import * as git from 'isomorphic-git'
-
-git.plugins.set('fs', fs)
+import os from 'os'
 
 let updateSequence = 0
 let persistedUpdateSequence = 0
 
-const ROOT_FOLDER = path.join((electron.app || electron.remote.app).getPath('userData'), 'ODIN-fs-store')
+const ROOT_FOLDER = path.join(os.homedir(), 'ODIN-fs-store')
+
+const GIT_AUTHOR = {
+  name: os.userInfo().username,
+  email: `${os.userInfo().username}@${os.hostname()}`
+}
+
+const commit = message => git.commit({
+  fs,
+  dir: ROOT_FOLDER,
+  author: GIT_AUTHOR,
+  message: message
+})
 
 const initializeGitStore = async (path) => {
   if (!fs.existsSync(path)) {
@@ -22,6 +33,7 @@ const initializeGitStore = async (path) => {
   /* git init runs every time the app starts, so noOverwrite MUST BE TRUE to avoid data loss */
   try {
     await git.init({
+      fs,
       dir: path,
       noOverwrite: true
     })
@@ -47,19 +59,11 @@ const writeLayer = (state, layerId) => {
     }
     console.log(`done persisting ${fullPathAndFileName}`)
     git.add({
+      fs,
       dir: ROOT_FOLDER,
       filepath: fileName
     })
-      .then(() => {
-        return git.commit({
-          dir: ROOT_FOLDER,
-          author: {
-            name: 'thomas',
-            email: 'thomas.halwax@syncpoint.io'
-          },
-          message: `persisted layer id ${layerId}`
-        })
-      })
+      .then(() => commit(`persisted layer id ${layerId}`))
       .then(sha => {
         console.log(`commited changes with hash ${sha}`)
         persistedUpdateSequence = updateSequence
@@ -79,19 +83,11 @@ const deleteLayer = deleteLayerEvent => {
 
   fs.unlinkSync(fullPath)
   git.remove({
+    fs,
     gitdir: ROOT_FOLDER,
     filepath: layerFileName
   })
-    .then(() => {
-      return git.commit({
-        dir: ROOT_FOLDER,
-        author: {
-          name: 'thomas',
-          email: 'thomas.halwax@syncpoint.io'
-        },
-        message: `removed layer ${deleteLayerEvent.layerId}`
-      })
-    })
+    .then(() => commit(`removed layer ${deleteLayerEvent.layerId}`))
     .catch(error => {
       console.error(error)
     })
@@ -155,7 +151,6 @@ const replay = reduce => {
     })
     .then(() => reduce({ type: 'replay-ready' }))
 }
-
 
 replay(reduce).then(() => reducers.push(reduce))
 
