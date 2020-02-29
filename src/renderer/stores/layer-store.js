@@ -19,6 +19,7 @@ const GIT_AUTHOR = {
   email: `${os.userInfo().username}@${os.hostname()}`
 }
 
+// gets called for C_UD oberations
 const commit = message => git.commit({
   fs,
   dir: ROOT_FOLDER,
@@ -39,11 +40,11 @@ const initializeGitStore = async (path) => {
     })
     console.log(`initialized git repo at ${path}`)
   } catch (error) {
-    console.error(error)
+    console.error(`failed to initialize git repository ${path}: ${error.message}`)
   }
 }
 
-const writeLayer = (state, layerId) => {
+const writeLayer = async (state, layerId) => {
   console.log(`updateSequence: ${updateSequence} -- persistedUpdateSequence: ${persistedUpdateSequence}`)
   if (updateSequence === persistedUpdateSequence) {
     console.log('nothing has changed, skipping git persistance')
@@ -53,44 +54,40 @@ const writeLayer = (state, layerId) => {
   const fileName = `${layerId}.json`
   const fullPathAndFileName = path.join(ROOT_FOLDER, fileName)
   const content = JSON.stringify(state[layerId], null, 2)
-  fs.writeFile(fullPathAndFileName, content, error => {
-    if (error) {
-      return console.error(error)
-    }
+  try {
+    await fs.promises.writeFile(fullPathAndFileName, content)
     console.log(`done persisting ${fullPathAndFileName}`)
-    git.add({
+    await git.add({
       fs,
       dir: ROOT_FOLDER,
       filepath: fileName
     })
-      .then(() => commit(`persisted layer id ${layerId}`))
-      .then(sha => {
-        console.log(`commited changes with hash ${sha}`)
-        persistedUpdateSequence = updateSequence
-      })
-      .catch(error => {
-        console.error(error)
-      })
-  })
+    const commitHash = await commit(`persisted layer id ${layerId}`)
+    console.log(`commited changes with hash ${commitHash}`)
+    persistedUpdateSequence = updateSequence
+  } catch (error) {
+    console.error(`failed to write layer ${layerId}: ${error.message}`)
+  }
   console.timeEnd('save-layer-and-commit')
 }
 
-const deleteLayer = deleteLayerEvent => {
+const deleteLayer = async deleteLayerEvent => {
   const layerFileName = `${deleteLayerEvent.layerId}.json`
   const fullPath = path.join(ROOT_FOLDER, layerFileName)
 
   if (!fs.existsSync(fullPath)) return
-
-  fs.unlinkSync(fullPath)
-  git.remove({
-    fs,
-    gitdir: ROOT_FOLDER,
-    filepath: layerFileName
-  })
-    .then(() => commit(`removed layer ${deleteLayerEvent.layerId}`))
-    .catch(error => {
-      console.error(error)
+  try {
+    await fs.promises.unlink(fullPath)
+    await git.remove({
+      fs,
+      dir: ROOT_FOLDER,
+      filepath: layerFileName
     })
+    const commitHash = await commit(`deleted layer ${deleteLayerEvent.layerId}`)
+    console.log(`commited changes with hash ${commitHash}`)
+  } catch (error) {
+    console.error(`failed to delete layer ${deleteLayerEvent.layerId}: ${error.message}`)
+  }
 }
 
 /* -- experimantal fs store ... */
