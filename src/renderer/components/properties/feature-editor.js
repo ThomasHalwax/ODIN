@@ -10,6 +10,7 @@ import BoundaryLineProperties from './BoundaryLineProperties'
 import PointProperties from './PointProperties'
 import StabilityOperationsProperties from './StabilityOperationsProperties'
 import EEIProperties from './EEIProperties'
+import InstallationProperties from './InstallationProperties'
 
 const featureClasses = {
   U: {
@@ -30,7 +31,12 @@ const featureClasses = {
     pane: (layerId, featureId, feature) => <EquipmentProperties layerId={ layerId } featureId={ featureId } feature={ feature } />
   },
 
-  I: { description: 'Installations', patterns: [/^S.G.I.*$/] }, // S.G.......H.*
+  I: {
+    description: 'Installations',
+    patterns: [/^S.G.I.*$/],
+    pane: (layerId, featureId, feature) => <InstallationProperties layerId={ layerId } featureId={ featureId } feature={ feature } />
+  },
+
   SI: { description: 'Signals Intelligence', patterns: [/^I.*$/] },
 
   SO: {
@@ -45,17 +51,25 @@ const featureClasses = {
     patterns: [/^E.I.*$/],
     pane: (layerId, featureId, feature) => <EEIProperties layerId={ layerId } featureId={ featureId } feature={ feature } />
   },
-  EI: { description: 'EMS Installations', patterns: [/^E.O.......H.*$/, /^E.F.......H.*$/] },
+
+  EI: {
+    description: 'EMS Installations',
+    patterns: [/^E.O.......H.*$/, /^E.F.......H.*$/],
+    pane: (layerId, featureId, feature) => <InstallationProperties layerId={ layerId } featureId={ featureId } feature={ feature } />
+  },
 
   P: {
     description: 'Points',
     // TODO: check if one pattern is enough: /^G.G..P.*$/
     patterns: [
-      /^G.G.GP.*$/,
+      /^G.F.PC.*$/, // COMMAND & CONTROL POINTS
       /^G.G.AP.*$/,
-      /^G.S.P.*$/, // combat service support
+      /^G.G.GP.*$/,
+      /^G.G.OPP.*$/, // POINT OF DEPARTURE
       /^G.G.DP.*$/, // defense points
-      /^G.M.BCP.*$/ // ENGINEER REGULATING POINT
+      /^G.M.BCP.*$/, // ENGINEER REGULATING POINT
+      /^G.M.ND.*$/, // DECONTAMINATION (DECON) POINTS
+      /^G.S.P.*$/ // combat service support
     ],
     pane: (layerId, featureId, feature) => <PointProperties layerId={ layerId } featureId={ featureId } feature={ feature } />
   },

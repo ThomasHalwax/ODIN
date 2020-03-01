@@ -16,7 +16,7 @@ export default register => {
 
   const layerItem = (layerId, name, checked) => {
     const [label, ...tags] = name.split(':')
-    const props = { label, tags: ['Layer', ...tags], checked }
+    const props = { label, tags: ['Layer', ...tags], checked, layerId }
 
     return {
       key: ResourceNames.layerId(layerId),
@@ -37,7 +37,8 @@ export default register => {
     const props = {
       label,
       tags: ['Layer'],
-      checked: checked
+      checked: checked,
+      layerId: ''
     }
 
     items.unshift({

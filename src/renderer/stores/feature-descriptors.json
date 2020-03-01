@@ -3868,8 +3868,7 @@
       "GROUND SURVEILLANCE RADAR"
     ],
     "geometries": [
-      "point",
-      "polygon"
+      "point"
     ]
   },
   {
@@ -3881,8 +3880,7 @@
       "AMMUNITION SUPPLY POINT (ASP)"
     ],
     "geometries": [
-      "point",
-      "polygon"
+      "point"
     ]
   },
   {
