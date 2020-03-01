@@ -50,11 +50,13 @@ const writeLayer = async (state, layerId) => {
     console.log('nothing has changed, skipping git persistance')
     return
   }
-  console.time('save-layer-and-commit')
+
   const fileName = `${layerId}.json`
   const fullPathAndFileName = path.join(ROOT_FOLDER, fileName)
-  const content = JSON.stringify(state[layerId], null, 2)
+
   try {
+    console.time('save-layer-and-commit')
+    const content = JSON.stringify(state[layerId], null, 2)
     await fs.promises.writeFile(fullPathAndFileName, content)
     console.log(`done persisting ${fullPathAndFileName}`)
     await git.add({
@@ -67,8 +69,9 @@ const writeLayer = async (state, layerId) => {
     persistedUpdateSequence = updateSequence
   } catch (error) {
     console.error(`failed to write layer ${layerId}: ${error.message}`)
+  } finally {
+    console.timeEnd('save-layer-and-commit')
   }
-  console.timeEnd('save-layer-and-commit')
 }
 
 const deleteLayer = async deleteLayerEvent => {
@@ -157,7 +160,6 @@ evented.addLayer = (layerId, name) => {
   const existing = Object.entries(state).find(([_, layer]) => layer.name === name)
   if (existing) persist({ type: 'layer-deleted', layerId: existing[0] })
   persist({ type: 'layer-added', layerId, name, show: true })
-  writeLayer(state, layerId)
 }
 
 evented.updateBounds = (layerId, bbox) => {

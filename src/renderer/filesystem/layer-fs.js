@@ -24,6 +24,7 @@ const importFile = filename => featureCollection(filename).then(collection => {
   const layerId = uuid()
   store.addLayer(layerId, basename)
   collection.features.forEach(feature => store.addFeature(layerId)(uuid(), feature))
+  store.commands.commit(layerId)
   return [layerId, collection]
 })
 
