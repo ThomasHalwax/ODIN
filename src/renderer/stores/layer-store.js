@@ -152,8 +152,6 @@ const replay = reduce => {
     .then(() => reduce({ type: 'replay-ready' }))
 }
 
-replay(reduce).then(() => reducers.push(reduce))
-
 // Add new or replace existing layer.
 evented.addLayer = (layerId, name) => {
   // Delete layer with same name, if one exists:
@@ -265,6 +263,7 @@ ipcRenderer.on('COMMAND_LOAD_LAYER', (_, name, collection) => {
 
 ;(async () => {
   await initializeGitStore(ROOT_FOLDER)
+  replay(reduce).then(() => reducers.push(reduce))
 })()
 
 export default evented
